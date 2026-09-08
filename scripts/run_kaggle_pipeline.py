@@ -15,6 +15,11 @@ import sys
 import zipfile
 import torch
 
+# Ensure repository root is in sys.path regardless of execution directory
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from veyra.checkpoints.manager import CheckpointManager
 from veyra.config.dataset_config import DatasetMixConfig, DatasetSourceConfig
 from veyra.config.model_config import ModelConfig

@@ -28,7 +28,7 @@ In the first cell of your Kaggle notebook, run:
 ```bash
 !git clone https://github.com/shreyashmane-dev/Veyra.git
 %cd Veyra
-!pip install -r requirements.txt -q
+!pip install -e . -q
 ```
 
 ---

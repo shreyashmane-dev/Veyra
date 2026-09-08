@@ -1,8 +1,8 @@
-from __future__ import annotations
-
+from collections import defaultdict
 import json
 from pathlib import Path
 import re
+import time
 from typing import Any, Iterable
 
 
@@ -130,9 +130,9 @@ class VeyraTokenizer:
         texts: Iterable[str],
         vocab_size: int | None = None,
         min_frequency: int = 2,
-        show_progress: bool = False,
+        show_progress: bool = True,
     ) -> None:
-        """Trains BPE merge rules from an iterable of training texts."""
+        """Trains BPE merge rules from an iterable of training texts using a fast inverted-index algorithm."""
         if vocab_size is not None:
             self.target_vocab_size = vocab_size
 
@@ -153,18 +153,27 @@ class VeyraTokenizer:
         if num_merges_to_learn <= 0:
             return
 
-        for merge_idx in range(num_merges_to_learn):
-            # Count pair frequencies
-            pair_counts: dict[tuple[str, str], int] = {}
-            for word, freq in word_counts.items():
-                for i in range(len(word) - 1):
-                    pair = (word[i], word[i + 1])
-                    pair_counts[pair] = pair_counts.get(pair, 0) + freq
+        vocab: list[tuple[str, ...]] = list(word_counts.keys())
+        freqs: list[int] = list(word_counts.values())
 
+        # Inverted index: pair -> frequency count, pair -> set of word indices
+        pair_counts: dict[tuple[str, str], int] = defaultdict(int)
+        pair_to_words: dict[tuple[str, str], set[int]] = defaultdict(set)
+
+        for w_idx, (w, freq) in enumerate(zip(vocab, freqs)):
+            for i in range(len(w) - 1):
+                p = (w[i], w[i + 1])
+                pair_counts[p] += freq
+                pair_to_words[p].add(w_idx)
+
+        t_start = time.time()
+        for merge_idx in range(num_merges_to_learn):
             if not pair_counts:
                 break
 
-            best_pair, best_count = max(pair_counts.items(), key=lambda item: item[1])
+            # Deterministic best pair selection
+            best_pair = max(pair_counts, key=lambda p: (pair_counts[p], p))
+            best_count = pair_counts[best_pair]
             if best_count < min_frequency:
                 break
 
@@ -176,21 +185,54 @@ class VeyraTokenizer:
             self.merges.append(best_pair)
             self.merge_ranks[best_pair] = merge_idx
 
-            # Update word_counts with merged tokens
-            new_word_counts: dict[tuple[str, ...], int] = {}
+            del pair_counts[best_pair]
+            affected_words = list(pair_to_words[best_pair])
+            del pair_to_words[best_pair]
+
             p0, p1 = best_pair
-            for word, freq in word_counts.items():
-                new_word: list[str] = []
+            for w_idx in affected_words:
+                w = vocab[w_idx]
+                f = freqs[w_idx]
+
+                # Decrement counts of old pairs in this word
+                for i in range(len(w) - 1):
+                    pair = (w[i], w[i + 1])
+                    if pair in pair_counts:
+                        pair_counts[pair] -= f
+                        if pair_counts[pair] <= 0:
+                            del pair_counts[pair]
+                    if pair in pair_to_words:
+                        pair_to_words[pair].discard(w_idx)
+
+                # Merge occurrences of best_pair in this word
+                new_w: list[str] = []
                 i = 0
-                while i < len(word):
-                    if i < len(word) - 1 and word[i] == p0 and word[i + 1] == p1:
-                        new_word.append(merged_token)
+                while i < len(w):
+                    if i < len(w) - 1 and w[i] == p0 and w[i + 1] == p1:
+                        new_w.append(merged_token)
                         i += 2
                     else:
-                        new_word.append(word[i])
+                        new_w.append(w[i])
                         i += 1
-                new_word_counts[tuple(new_word)] = freq
-            word_counts = new_word_counts
+                new_tuple = tuple(new_w)
+                vocab[w_idx] = new_tuple
+
+                # Increment counts of newly formed pairs
+                for i in range(len(new_tuple) - 1):
+                    pair = (new_tuple[i], new_tuple[i + 1])
+                    pair_counts[pair] += f
+                    pair_to_words[pair].add(w_idx)
+
+            if show_progress and ((merge_idx + 1) % 250 == 0 or (merge_idx + 1) == num_merges_to_learn):
+                elapsed = time.time() - t_start
+                rate = (merge_idx + 1) / max(elapsed, 0.001)
+                pct = ((merge_idx + 1) / num_merges_to_learn) * 100
+                remaining = (num_merges_to_learn - (merge_idx + 1)) / max(rate, 1)
+                print(
+                    f"    [BPE Progress] Merge {merge_idx + 1:,}/{num_merges_to_learn:,} ({pct:.1f}%) | "
+                    f"Vocab: {len(self.token_to_id):,} | {rate:.0f} merges/s | ETA: {remaining:.0f}s",
+                    flush=True,
+                )
 
     def _apply_merges_to_word(self, word_tokens: list[str]) -> list[str]:
         """Iteratively applies known BPE merges to a sequence of tokens in priority order."""

@@ -38,7 +38,7 @@ def main() -> None:
     parser.add_argument("--model", choices=["tiny", "125m", "350m"], default="125m", help="Target model architecture")
     parser.add_argument("--steps", type=int, default=None, help="Override maximum training steps")
     parser.add_argument("--batch-size", type=int, default=None, help="Override micro-batch size")
-    parser.add_argument("--vocab-size", type=int, default=32000, help="Vocabulary size for tokenizer")
+    parser.add_argument("--vocab-size", type=int, default=8192, help="Vocabulary size for tokenizer (default: 8192)")
     parser.add_argument(
         "--recipe",
         choices=["veyra_mix", "fineweb_edu", "cosmopedia", "finemath", "the_stack", "auto"],
@@ -128,30 +128,35 @@ def main() -> None:
     print(f"\n[2/5] Building VeyraTokenizer...")
     target_vocab = args.vocab_size if args.model != "tiny" else 1024
 
-    all_texts = []
-    for rf in raw_files:
-        try:
-            with open(rf, "r", encoding="utf-8", errors="replace") as f:
-                if rf.suffix == ".jsonl":
-                    # Sample text from jsonl
-                    for line_idx, line in enumerate(f):
-                        if line_idx > 2000:
-                            break
-                        rec = json.loads(line)
-                        if "text" in rec:
-                            all_texts.append(rec["text"][:1000])
-                else:
-                    sample_text = f.read(3 * 1024 * 1024)
-                    if sample_text:
-                        all_texts.append(sample_text)
-        except Exception:
-            pass
+    if (tok_dir / "vocab.json").exists() and (tok_dir / "merges.json").exists():
+        print(f"  Existing VeyraTokenizer found in {tok_dir}. Loading...")
+        tokenizer = VeyraTokenizer.load(tok_dir)
+        print(f"  VeyraTokenizer loaded successfully! Vocab size: {tokenizer.vocab_size}")
+    else:
+        all_texts = []
+        for rf in raw_files:
+            try:
+                with open(rf, "r", encoding="utf-8", errors="replace") as f:
+                    if rf.suffix == ".jsonl":
+                        # Sample diverse texts from jsonl
+                        for line_idx, line in enumerate(f):
+                            if line_idx >= 400:
+                                break
+                            rec = json.loads(line)
+                            if "text" in rec:
+                                all_texts.append(rec["text"][:1500])
+                    else:
+                        sample_text = f.read(1 * 1024 * 1024)
+                        if sample_text:
+                            all_texts.append(sample_text)
+            except Exception:
+                pass
 
-    tokenizer = VeyraTokenizer(vocab_size=target_vocab)
-    print(f"  Training tokenizer from {len(all_texts)} text blocks (target vocab: {target_vocab})...")
-    tokenizer.train_from_texts(all_texts, min_frequency=2)
-    tokenizer.save(tok_dir)
-    print(f"  VeyraTokenizer trained successfully! Final vocab size: {tokenizer.vocab_size}")
+        tokenizer = VeyraTokenizer(vocab_size=target_vocab)
+        print(f"  Training tokenizer from {len(all_texts)} text blocks (target vocab: {target_vocab})...")
+        tokenizer.train_from_texts(all_texts, min_frequency=2, show_progress=True)
+        tokenizer.save(tok_dir)
+        print(f"  VeyraTokenizer trained successfully! Final vocab size: {tokenizer.vocab_size}")
 
     # 5. Preprocess & Shard
     print(f"\n[3/5] Preprocessing and Sharding Datasets...")

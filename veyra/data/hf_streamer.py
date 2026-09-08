@@ -23,7 +23,7 @@ PRETRAINING_RECIPES = {
         "default_weight": 0.25,
     },
     "finemath": {
-        "hf_repo": "HuggingFaceFW/finemath",
+        "hf_repo": "HuggingFaceTB/finemath",
         "subset": "finemath-4plus",
         "text_field": "text",
         "description": "High quality mathematical reasoning and step-by-step problem solving.",
@@ -32,18 +32,17 @@ PRETRAINING_RECIPES = {
     },
     "the_stack": {
         "hf_repo": "bigcode/the-stack-smol-xl",
-        "subset": "data",
+        "data_dir": "data/python",
         "text_field": "content",
         "description": "Clean, permissively-licensed programming and algorithm code.",
         "license": "Permissive (MIT/Apache/BSD)",
         "default_weight": 0.15,
     },
     "dolma_sample": {
-        "hf_repo": "allenai/dolma",
-        "subset": "v1_6-sample",
+        "hf_repo": "DKYoon/SlimPajama-6B",
         "text_field": "text",
-        "description": "Broad, diverse open pretraining text curated by AI2.",
-        "license": "Open Data Commons",
+        "description": "Broad, diverse open pretraining text curated from SlimPajama.",
+        "license": "Apache 2.0",
         "default_weight": 0.10,
     },
 }
@@ -83,12 +82,13 @@ class PretrainingDatasetIngester:
             )
 
         # Stream without downloading the entire multi-terabyte corpus
-        ds = load_dataset(
-            recipe["hf_repo"],
-            name=recipe["subset"],
-            split="train",
-            streaming=True,
-        )
+        load_kwargs: dict[str, Any] = {"split": "train", "streaming": True}
+        if recipe.get("subset"):
+            load_kwargs["name"] = recipe["subset"]
+        if recipe.get("data_dir"):
+            load_kwargs["data_dir"] = recipe["data_dir"]
+
+        ds = load_dataset(recipe["hf_repo"], **load_kwargs)
 
         text_col = recipe["text_field"]
         collected = 0

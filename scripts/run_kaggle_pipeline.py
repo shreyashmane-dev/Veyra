@@ -46,6 +46,7 @@ def main() -> None:
         help="Pretraining dataset recipe to stream (FineWeb-Edu, Cosmopedia, etc.)",
     )
     parser.add_argument("--num-docs", type=int, default=10000, help="Number of documents to stream")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint .pt file to resume training from")
     args = parser.parse_args()
 
     print("\n" + "=" * 70)
@@ -213,6 +214,9 @@ def main() -> None:
         train_dataset=train_ds,
         val_dataset=val_ds,
     )
+    if args.resume:
+        trainer.resume_from_checkpoint(args.resume)
+
     train_results = trainer.train()
 
     # 8. Package Artifacts into ZIP for direct download

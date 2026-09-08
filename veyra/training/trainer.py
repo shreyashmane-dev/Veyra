@@ -68,6 +68,24 @@ class Trainer:
         self.current_step = 0
         self.best_val_loss = float("inf")
 
+    def resume_from_checkpoint(self, checkpoint_path: str | Path) -> None:
+        """Restores model weights, optimizer state, and step counter from checkpoint."""
+        p = Path(checkpoint_path)
+        if not p.exists():
+            print(f"[WARN] Checkpoint not found at '{p}'. Starting fresh.")
+            return
+
+        payload = torch.load(p, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(payload["model_state_dict"])
+        if "optimizer_state_dict" in payload and payload["optimizer_state_dict"] is not None:
+            try:
+                self.optimizer.load_state_dict(payload["optimizer_state_dict"])
+            except Exception as e:
+                print(f"[WARN] Could not restore optimizer state ({e}). Optimizer reinitialized.")
+        self.current_step = payload.get("step", 0)
+        self.best_val_loss = payload.get("loss", float("inf"))
+        print(f"--> Successfully resumed training from step {self.current_step} (loss: {self.best_val_loss:.4f})")
+
     def _create_optimizer(self) -> torch.optim.AdamW:
         """Separates 2D parameters (weights) for weight decay from 1D parameters (norms, biases)."""
         decay_params = []

@@ -8,6 +8,7 @@ Usage inside Kaggle Notebook:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -38,6 +39,13 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=None, help="Override maximum training steps")
     parser.add_argument("--batch-size", type=int, default=None, help="Override micro-batch size")
     parser.add_argument("--vocab-size", type=int, default=32000, help="Vocabulary size for tokenizer")
+    parser.add_argument(
+        "--recipe",
+        choices=["veyra_mix", "fineweb_edu", "cosmopedia", "finemath", "the_stack", "auto"],
+        default="auto",
+        help="Pretraining dataset recipe to stream (FineWeb-Edu, Cosmopedia, etc.)",
+    )
+    parser.add_argument("--num-docs", type=int, default=10000, help="Number of documents to stream")
     args = parser.parse_args()
 
     print("\n" + "=" * 70)
@@ -73,18 +81,45 @@ def main() -> None:
             try:
                 staged = adapter.stage_kaggle_dataset(name, f"{name}.txt")
                 raw_files.append(staged)
-                print(f"      Staged to: {staged}")
             except Exception as e:
                 print(f"      Could not auto-stage {name}: {e}")
     else:
-        print(f"  Using existing raw datasets in {root_dir / 'data' / 'raw'}")
+        print(f"  Using local raw datasets in {root_dir / 'data' / 'raw'}")
 
-    if not raw_files:
-        print("  No raw files found. Creating bootstrap corpus...")
-        boot_path = root_dir / "data" / "raw" / "bootstrap_corpus.txt"
-        boot_path.parent.mkdir(parents=True, exist_ok=True)
-        boot_path.write_text("VEYRA is an artificial intelligence system.\n" * 100, encoding="utf-8")
-        raw_files.append(boot_path)
+    total_raw_bytes = sum(f.stat().st_size for f in raw_files if f.exists())
+    recipe = args.recipe
+    if recipe == "auto":
+        recipe = "veyra_mix" if total_raw_bytes < 100_000 else "none"
+
+    if recipe != "none":
+        print(f"\n  Activating Dataset Recipe: [{recipe}] (FineWeb-Edu, Cosmopedia, FineMath, The Stack)...")
+        try:
+            from veyra.data.hf_streamer import PretrainingDatasetIngester
+            ingester = PretrainingDatasetIngester(raw_dir=root_dir / "data" / "raw")
+            if recipe == "veyra_mix":
+                paths = ingester.build_veyra_curated_recipe(total_docs=args.num_docs)
+                raw_files.extend(paths)
+            else:
+                p = ingester.stream_dataset(recipe, num_documents=args.num_docs)
+                raw_files.append(p)
+        except Exception as e:
+            print(f"  [INFO] Streaming unavailable ({e}). Falling back to HTTP download...")
+            try:
+                from scripts.download_pretraining_data import download_file, DATASET_URLS
+                dl_path = root_dir / "data" / "raw" / "tinystories_pretrain.txt"
+                download_file(DATASET_URLS["tinystories_sample"], dl_path, max_bytes=20 * 1024 * 1024)
+                if dl_path.exists():
+                    raw_files.append(dl_path)
+            except Exception as e2:
+                print(f"  [WARN] Fallback download failed: {e2}. Generating synthetic expansion...")
+                boot_path = root_dir / "data" / "raw" / "bootstrap_corpus.txt"
+                aug_path = root_dir / "data" / "raw" / "augmented_corpus.txt"
+                base_content = boot_path.read_text(encoding="utf-8") if boot_path.exists() else "VEYRA.\n"
+                aug_path.write_text((base_content + "\n\n") * 60, encoding="utf-8")
+                raw_files.append(aug_path)
+
+    # Deduplicate raw_files
+    raw_files = list({f.resolve(): f for f in raw_files if f.exists()}.values())
 
     # 4. Train or load Tokenizer
     tok_dir = root_dir / "data" / "tokenizer"
@@ -93,15 +128,26 @@ def main() -> None:
     target_vocab = args.vocab_size if args.model != "tiny" else 1024
 
     all_texts = []
-    for rf in raw_files[:5]:
+    for rf in raw_files:
         try:
             with open(rf, "r", encoding="utf-8", errors="replace") as f:
-                all_texts.append(f.read())
+                if rf.suffix == ".jsonl":
+                    # Sample text from jsonl
+                    for line_idx, line in enumerate(f):
+                        if line_idx > 2000:
+                            break
+                        rec = json.loads(line)
+                        if "text" in rec:
+                            all_texts.append(rec["text"][:1000])
+                else:
+                    sample_text = f.read(3 * 1024 * 1024)
+                    if sample_text:
+                        all_texts.append(sample_text)
         except Exception:
             pass
 
     tokenizer = VeyraTokenizer(vocab_size=target_vocab)
-    print(f"  Training tokenizer from {len(all_texts)} source documents (target vocab: {target_vocab})...")
+    print(f"  Training tokenizer from {len(all_texts)} text blocks (target vocab: {target_vocab})...")
     tokenizer.train_from_texts(all_texts, min_frequency=2)
     tokenizer.save(tok_dir)
     print(f"  VeyraTokenizer trained successfully! Final vocab size: {tokenizer.vocab_size}")
@@ -109,15 +155,18 @@ def main() -> None:
     # 5. Preprocess & Shard
     print(f"\n[3/5] Preprocessing and Sharding Datasets...")
     shards_dir = root_dir / "data" / "shards"
-    sources = [
-        DatasetSourceConfig(
-            name=rf.stem,
-            source_type="local",
-            path_or_identifier=str(rf),
-            file_format="txt",
+    sources = []
+    for rf in raw_files:
+        fmt = "jsonl" if rf.suffix == ".jsonl" else ("csv" if rf.suffix == ".csv" else "txt")
+        sources.append(
+            DatasetSourceConfig(
+                name=rf.stem,
+                source_type="local",
+                path_or_identifier=str(rf),
+                file_format=fmt,
+                text_column="text",
+            )
         )
-        for rf in raw_files
-    ]
     mix_cfg = DatasetMixConfig(
         tokenizer_path=str(tok_dir),
         max_sequence_length=128 if args.model == "tiny" else 512,

@@ -43,12 +43,25 @@ class Trainer:
         # 3. Setup optimizer with weight decay separation
         self.optimizer = self._create_optimizer()
 
-        # 4. Data loaders
+        # 4. Data loaders with small dataset protection
+        if len(self.train_dataset) == 0:
+            raise ValueError(
+                "Training dataset contains 0 sequences! "
+                "Ensure sufficient raw text is placed under data/raw/ and sharded before training."
+            )
+
+        effective_batch_size = min(self.config.batch_size, len(self.train_dataset))
+        if effective_batch_size < self.config.batch_size:
+            print(
+                f"[WARN] Train dataset only has {len(self.train_dataset)} sequences. "
+                f"Automatically adjusting batch_size from {self.config.batch_size} to {effective_batch_size}."
+            )
+
         self.train_loader = DataLoader(
             self.train_dataset,
-            batch_size=self.config.batch_size,
+            batch_size=effective_batch_size,
             shuffle=True,
-            drop_last=True,
+            drop_last=False if len(self.train_dataset) < self.config.batch_size else True,
         )
 
         # 5. Tracking state
@@ -152,7 +165,13 @@ class Trainer:
                     batch = next(train_iter)
                 except StopIteration:
                     train_iter = iter(self.train_loader)
-                    batch = next(train_iter)
+                    try:
+                        batch = next(train_iter)
+                    except StopIteration:
+                        raise RuntimeError(
+                            f"DataLoader has 0 batches to yield! Total dataset sequences: {len(self.train_dataset)}, "
+                            f"configured batch_size: {self.config.batch_size}. Please provide more training data."
+                        )
 
                 input_ids = batch["input_ids"].to(self.device)
                 labels = batch["labels"].to(self.device)

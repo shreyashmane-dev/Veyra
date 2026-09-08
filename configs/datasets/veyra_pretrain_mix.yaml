@@ -1,0 +1,66 @@
+version: 0.1.0
+tokenizer_path: data/tokenizer
+max_sequence_length: 512
+train_ratio: 0.95
+val_ratio: 0.05
+test_ratio: 0.0
+sources:
+  - name: fineweb_edu
+    source_type: local
+    path_or_identifier: data/raw/fineweb_edu.jsonl
+    license: ODC-By 1.0
+    language: en
+    text_column: text
+    file_format: jsonl
+    sampling_weight: 0.35
+    min_chars: 50
+    max_chars: 100000
+    filter_duplicates: true
+
+  - name: cosmopedia
+    source_type: local
+    path_or_identifier: data/raw/cosmopedia.jsonl
+    license: Apache 2.0
+    language: en
+    text_column: text
+    file_format: jsonl
+    sampling_weight: 0.25
+    min_chars: 50
+    max_chars: 100000
+    filter_duplicates: true
+
+  - name: finemath
+    source_type: local
+    path_or_identifier: data/raw/finemath.jsonl
+    license: ODC-By 1.0
+    language: en
+    text_column: text
+    file_format: jsonl
+    sampling_weight: 0.15
+    min_chars: 30
+    max_chars: 100000
+    filter_duplicates: true
+
+  - name: the_stack
+    source_type: local
+    path_or_identifier: data/raw/the_stack.jsonl
+    license: Permissive (MIT/Apache/BSD)
+    language: en
+    text_column: text
+    file_format: jsonl
+    sampling_weight: 0.15
+    min_chars: 30
+    max_chars: 100000
+    filter_duplicates: true
+
+  - name: dolma_sample
+    source_type: local
+    path_or_identifier: data/raw/dolma_sample.jsonl
+    license: Open Data Commons
+    language: en
+    text_column: text
+    file_format: jsonl
+    sampling_weight: 0.10
+    min_chars: 50
+    max_chars: 100000
+    filter_duplicates: true

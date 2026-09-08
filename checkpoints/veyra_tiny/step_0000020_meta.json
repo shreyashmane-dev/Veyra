@@ -1,0 +1,13 @@
+{
+  "step": 20,
+  "loss": 6.1991,
+  "perplexity": 492.29,
+  "model_name": "veyra-tiny",
+  "vocab_size": 1024,
+  "context_length": 128,
+  "hidden_size": 128,
+  "num_layers": 4,
+  "total_parameters": 922752,
+  "saved_at": "2026-09-08T17:45:38.608637+00:00",
+  "checkpoint_file": "step_0000020.pt"
+}

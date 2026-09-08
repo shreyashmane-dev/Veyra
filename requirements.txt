@@ -1,0 +1,4 @@
+# Core deep learning and system dependencies for VEYRA-LM
+torch>=2.0.0
+pyyaml>=6.0
+psutil>=5.9.0

@@ -1,0 +1,18 @@
+version: 0.1.0
+tokenizer_path: data/tokenizer
+max_sequence_length: 128
+train_ratio: 0.85
+val_ratio: 0.15
+test_ratio: 0.0
+sources:
+  - name: veyra_bootstrap
+    source_type: local
+    path_or_identifier: data/raw/bootstrap_corpus.txt
+    license: MIT
+    language: en
+    text_column: text
+    file_format: txt
+    sampling_weight: 1.0
+    min_chars: 10
+    max_chars: 50000
+    filter_duplicates: true

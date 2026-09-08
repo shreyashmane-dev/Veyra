@@ -1,0 +1,15 @@
+{
+  "target_vocab_size": 1024,
+  "special_tokens": [
+    "<PAD>",
+    "<UNK>",
+    "<BOS>",
+    "<EOS>",
+    "<USER>",
+    "<ASSISTANT>",
+    "<SYSTEM>",
+    "<TOOL>",
+    "<THOUGHT>"
+  ],
+  "vocab_size": 796
+}

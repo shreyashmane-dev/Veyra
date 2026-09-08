@@ -1,0 +1,22 @@
+{
+  "version": "0.1.0",
+  "total_documents": 12,
+  "total_tokens": 1629,
+  "sequence_length": 128,
+  "train_sequences": 11,
+  "val_sequences": 1,
+  "num_train_shards": 1,
+  "num_val_shards": 1,
+  "sources": [
+    {
+      "source_name": "veyra_bootstrap",
+      "license": "MIT",
+      "total_raw": 12,
+      "kept": 12,
+      "dropped_empty": 0,
+      "dropped_length": 0,
+      "dropped_repetitive": 0,
+      "dropped_duplicate": 0
+    }
+  ]
+}

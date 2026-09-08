@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+*.db
+
+# Large generated training artifacts and weights
+checkpoints/**/*.pt
+data/shards/**/*.pt
+data/private/*
+!data/private/.gitkeep
+.tmp*
+
+# Python packaging
+*.egg-info/
+build/
+dist/

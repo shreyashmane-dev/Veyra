@@ -1,0 +1,31 @@
+VEYRA is a personal artificial intelligence system developed from the ground up. The core language model is VEYRA-LM, an autoregressive decoder-only Transformer with rotary position embeddings, root mean square layer normalization, and SwiGLU feed-forward networks.
+
+In computer systems, an operating system manages hardware resources and provides common services for application programs. Key components include the kernel, process manager, memory manager, file system, and device drivers. Memory management uses paging and virtual memory to allocate address spaces safely.
+
+Computer Networks (CN) connect autonomous computing devices to exchange data and resources. The OSI model defines seven conceptual layers: physical, data link, network, transport, session, presentation, and application. The TCP/IP model simplifies this into network access, internet, transport, and application layers. TCP provides reliable, ordered, and error-checked delivery of a stream of octets, whereas UDP provides low-latency, connectionless transmission.
+
+Algorithms and data structures form the backbone of efficient software engineering. An array provides constant-time indexed access O(1), while linked lists provide efficient insertions and deletions at known positions. Binary search trees maintain sorted order, allowing search, minimum, maximum, predecessor, and successor queries in O(log n) time when balanced. Hash tables achieve average O(1) time complexity for insertions, lookups, and deletions by computing bucket indices from cryptographic or non-cryptographic hash functions.
+
+Python is a versatile, high-level programming language known for its clear syntax and dynamic typing. In Python, everything is an object. Functions can be passed as first-class citizens. List comprehensions offer a concise syntax when you want to create a new list based on the values of an existing list: squared = [x**2 for x in numbers if x % 2 == 0].
+
+Attention mechanisms in deep learning allow neural networks to focus on specific parts of an input sequence dynamically. The scaled dot-product attention computes softmax((Q * K^T) / sqrt(d_k)) * V. Rotary Position Embedding (RoPE) encodes relative positional information by rotating query and key vectors in the complex 2D plane, preserving distance relationships across arbitrary context lengths without requiring absolute positional embedding tables.
+
+SwiGLU is a gated linear unit variant that combines the SiLU (Swish) activation function with elementwise multiplication: SwiGLU(x) = (xW + b) * SiLU(xV + c). When combined with modern root mean square normalization (RMSNorm), training dynamics are remarkably stable and gradient propagation is preserved across deep transformer stacks.
+
+A cognitive AI architecture separates the raw predictive language model from long-term memory, reasoning, planning, and tool execution. VEYRA utilizes working memory for immediate dialogue context, semantic memory for learned facts and definitions, episodic memory for past interaction history, and procedural memory for executable tool workflows.
+
+<USER> Explain how binary search works. <ASSISTANT> Binary search is an efficient divide-and-conquer algorithm for finding an element in a sorted array. It repeatedly divides the search interval in half. If the target value is equal to the middle element, the search ends successfully. If the target is less than the middle element, the search continues in the lower half. Otherwise, it continues in the upper half. The time complexity is O(log n), which is exponentially faster than linear scanning O(n).
+
+<USER> What is the difference between TCP and UDP? <ASSISTANT> TCP (Transmission Control Protocol) is connection-oriented, reliable, and guarantees in-order delivery of data packets using sequence numbers and acknowledgments. It is ideal for web browsing, file transfers, and emails. UDP (User Datagram Protocol) is connectionless and lightweight with minimal overhead, but does not guarantee delivery or packet order. It is preferred for real-time applications such as video streaming, VoIP, and gaming.
+
+<USER> Write a Python function to compute the Fibonacci sequence recursively with memoization. <ASSISTANT>
+def fibonacci(n: int, memo: dict[int, int] | None = None) -> int:
+    if memo is None:
+        memo = {0: 0, 1: 1}
+    if n in memo:
+        return memo[n]
+    memo[n] = fibonacci(n - 1, memo) + fibonacci(n - 2, memo)
+    return memo[n]
+This memoized implementation reduces the time complexity from exponential O(2^n) to linear O(n).
+
+<USER> How does RMSNorm differ from LayerNorm? <ASSISTANT> LayerNorm computes both the mean and variance across the feature dimension and normalizes by subtracting the mean and dividing by the standard deviation. RMSNorm (Root Mean Square Normalization) simplifies this by assuming the mean is zero, normalizing activations strictly by their root mean square. This reduces computational cost by roughly 10% to 50% while maintaining identical or superior training stability in deep Transformers.

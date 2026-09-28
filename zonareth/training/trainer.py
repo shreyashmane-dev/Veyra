@@ -12,15 +12,15 @@ from ..checkpoints.manager import CheckpointManager
 from ..config.model_config import ModelConfig
 from ..config.training_config import TrainingConfig
 from ..data.pipeline import ShardedTokenDataset
-from ..model.model import VeyraLM
+from ..model.model import ZonarethLM, VeyraLM
 
 
 class Trainer:
-    """Production training engine for VEYRA-LM with safeguards, mixed precision, and scheduling."""
+    """Production training engine for ZONARETH-LM with safeguards, mixed precision, and scheduling."""
 
     def __init__(
         self,
-        model: VeyraLM,
+        model: ZonarethLM,
         training_config: TrainingConfig,
         train_dataset: ShardedTokenDataset,
         val_dataset: ShardedTokenDataset | None = None,
@@ -153,7 +153,7 @@ class Trainer:
         """Executes full training loop."""
         self.model.train()
         print("\n" + "=" * 70)
-        print(f"  VEYRA-LM TRAINING INITIALIZED: {self.config.run_name}")
+        print(f"  ZONARETH-LM TRAINING INITIALIZED: {self.config.run_name}")
         print("=" * 70)
         print(f"  Model Architecture : {self.model.config.model_name}")
         print(f"  Parameters         : {self.model.get_num_params():,}")

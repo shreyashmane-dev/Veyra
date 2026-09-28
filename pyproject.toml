@@ -3,14 +3,15 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "veyra-ai"
+name = "zonareth-ai"
 version = "0.1.0"
-description = "A personal AI system built from modular cognitive components"
+description = "A personal AI system and custom LLM built from modular cognitive components"
 requires-python = ">=3.10"
 
 [project.scripts]
-veyra = "veyra.cli.main:main"
+zonareth = "zonareth.cli.main:main"
+veyra = "zonareth.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["veyra*"]
+include = ["zonareth*", "veyra*"]

@@ -61,6 +61,8 @@ def main() -> None:
     )
     parser.add_argument("--num-docs", type=int, default=10000, help="Number of documents to stream")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint .pt file to resume training from")
+    parser.add_argument("--run-sft", action="store_true", help="Automatically run SFT instruction tuning immediately after pretraining")
+    parser.add_argument("--sft-steps", type=int, default=1500, help="Number of SFT steps if --run-sft is enabled (default: 1500)")
     parser.add_argument("--hf-repo", type=str, default=None, help="Optional Hugging Face repo ID (e.g. username/zonareth-125m) to push model")
     parser.add_argument("--hf-token", type=str, default=None, help="Hugging Face user access token (or set HF_TOKEN env var)")
     args = parser.parse_args()
@@ -366,11 +368,33 @@ print(f"Generated: {output}")
             print(f"  [WARN] Hugging Face push failed: {e}")
 
     print("\n" + "=" * 70)
-    print("  ALL ARTIFACTS SAFELY SAVED!")
+    print("  BASE PRETRAINING ARTIFACTS SAFELY SAVED!")
     print(f"  1. Lightweight Model : {model_zip_path.name} ({model_zip_size_mb:.2f} MB)")
     print(f"  2. Full Checkpoint   : {resume_zip_path.name} ({resume_zip_size_mb:.2f} MB)")
     print("  Files are available in Kaggle Working Directory / Output tab.")
     print("=" * 70 + "\n")
+
+    # 9. Optional: Automated SFT Instruction Tuning (All-Mix)
+    if args.run_sft:
+        print("\n" + "=" * 70)
+        print("  LAUNCHING AUTOMATED SFT INSTRUCTION TUNING (ALL-MIX)")
+        print("  (Fine-tuning on OpenHermes + CodeAlpaca + GSM8K)")
+        print("=" * 70)
+        from scripts.run_sft_pipeline import main as run_sft_main
+        orig_argv = sys.argv
+        sys.argv = [
+            "run_sft_pipeline.py",
+            "--base-checkpoint", str(output_dir / "latest.pt"),
+            "--tokenizer", str(tok_dir),
+            "--dataset", "all_mix",
+            "--steps", str(args.sft_steps),
+            "--batch-size", str(args.batch_size or 8),
+            "--output-dir", str(output_base / f"veyra_instruct_{args.model}"),
+        ]
+        try:
+            run_sft_main()
+        finally:
+            sys.argv = orig_argv
 
 
 if __name__ == "__main__":

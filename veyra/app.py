@@ -13,16 +13,21 @@ from .model.starter import StarterLanguageEngine
 def get_active_engine(memory: MemoryDB) -> tuple[LanguageEngine, str, str]:
     """Detects trained VEYRA-LM checkpoint or falls back to StarterLanguageEngine."""
     candidates = [
+        ("checkpoints/veyra_125m/latest.pt", "checkpoints/veyra_125m/tokenizer"),
+        ("checkpoints/veyra_125m/latest.pt", "data/tokenizer"),
+        ("checkpoints/veyra_125m/model.pt", "checkpoints/veyra_125m/tokenizer"),
+        ("checkpoints/zonareth_125m/model.pt", "checkpoints/zonareth_125m/tokenizer"),
         ("checkpoints/veyra_tiny/latest.pt", "data/tokenizer"),
         ("checkpoints/veyra_tiny/best.pt", "data/tokenizer"),
-        ("checkpoints/veyra_125m/latest.pt", "data/tokenizer"),
     ]
 
     for ckpt_path, tok_path in candidates:
         if Path(ckpt_path).exists() and Path(tok_path).exists():
             try:
                 engine = VeyraInferenceEngine.from_checkpoint(ckpt_path, tok_path)
-                return engine, "VEYRA-LM (Self-Trained Active)", ckpt_path
+                model_name = getattr(engine.model.config, "model_name", "125m")
+                params = engine.model.get_num_params()
+                return engine, f"VEYRA-LM ({model_name})", f"{ckpt_path} ({params:,} params)"
             except Exception as e:
                 # If checkpoint loading fails, continue checking or fallback
                 pass

@@ -21,7 +21,7 @@ class VeyraInferenceEngine(LanguageEngine):
         device: torch.device | str = "cpu",
         temperature: float = 0.7,
         top_p: float = 0.9,
-        max_new_tokens: int = 150,
+        max_new_tokens: int = 40,
         system_prompt: str = "You are VEYRA, a serious personal artificial intelligence system.",
     ) -> None:
         self.model = model
@@ -44,7 +44,7 @@ class VeyraInferenceEngine(LanguageEngine):
         device: str = "auto",
         temperature: float = 0.7,
         top_p: float = 0.9,
-        max_new_tokens: int = 150,
+        max_new_tokens: int = 40,
     ) -> VeyraInferenceEngine:
         """Loads inference engine directly from checkpoint file and tokenizer directory."""
         dev = "cuda" if (device == "auto" and torch.cuda.is_available()) else ("cpu" if device == "auto" else device)

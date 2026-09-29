@@ -51,19 +51,34 @@ GPU 0            : Tesla T4 (or Tesla P100) (15.8 GB VRAM)
 
 ## Step 4: Launch Training Pipeline
 
-### Option A: Serious Language Model Training (VEYRA-125M)
+### Option A: Full-Scale Overnight Training (Pretraining 8,000 steps + SFT Instruct 1,500 steps)
+*Recommended for full conversational intelligence, poetry, coding, and mathematical reasoning:*
 
 ```bash
-!python scripts/run_kaggle_pipeline.py --model 125m --steps 2500 --batch-size 8
+!python scripts/run_kaggle_pipeline.py \
+    --model 125m \
+    --steps 8000 \
+    --batch-size 8 \
+    --num-docs 25000 \
+    --save-interval 500 \
+    --max-to-keep 2 \
+    --run-sft \
+    --sft-steps 1500
 ```
 
 This automated runner:
-1. Ingests all text and datasets (including any Kaggle datasets attached in `/kaggle/input/`).
-2. Trains the native `VeyraTokenizer` to target vocabulary size (32,000).
-3. Preprocesses, cleans, deduplicates, and creates binary shards.
-4. Initializes the `VEYRA-125M` Transformer architecture.
-5. Runs the GPU training loop using `float16` mixed precision and AdamW.
-6. Automatically packages the resulting checkpoints (`best.pt`, `latest.pt`) and tokenizer files into a single downloadable archive: `/kaggle/working/veyra_125m_artifacts.zip`.
+1. Streams 25,000 multi-domain documents (*FineWeb-Edu*, *Cosmopedia*, *FineMath*, *The Stack*, *SlimPajama*).
+2. Builds the optimal 8,192 BPE tokenizer in ~10 seconds.
+3. Pretrains the 85.5M parameter Transformer on GPU with mixed precision and AdamW.
+4. Keeps only the 2 latest step checkpoints + `best.pt` so Kaggle disk never runs out of space.
+5. Immediately chains into **SFT instruction tuning** on *OpenHermes 2.5* (poems & conversation), *CodeAlpaca* (coding), and *GSM8K* (math).
+6. Automatically packages the final model into `/kaggle/working/veyra_instruct_125m_model.zip`.
+
+### Option B: Pretraining Only (No SFT)
+
+```bash
+!python scripts/run_kaggle_pipeline.py --model 125m --steps 5000 --batch-size 8 --num-docs 15000
+```
 
 ### Option B: Quick Verification Run (VEYRA-TINY)
 

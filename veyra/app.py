@@ -71,4 +71,16 @@ def main() -> None:
         if text == "/quit":
             print("VEYRA > Goodbye, Sensei.")
             break
-        print(f"VEYRA > {core.handle(text)}")
+
+        streamed = [False]
+
+        def on_stream(piece: str) -> None:
+            streamed[0] = True
+            print(piece, end="", flush=True)
+
+        print("VEYRA > ", end="", flush=True)
+        response = core.handle(text, stream_callback=on_stream)
+        if not streamed[0]:
+            print(response)
+        else:
+            print()

@@ -83,20 +83,65 @@ class GenerationEngine:
         stop_token_ids: list[int] | None = None,
         callback: Callable[[int], None] | None = None,
     ) -> list[int]:
-        """Generates tokens autoregressively given prompt token IDs."""
+        """Generates tokens autoregressively with KV caching for optimal performance."""
         self.model.eval()
         stop_ids = set(stop_token_ids or [])
         generated: list[int] = list(prompt_ids)
 
-        for _ in range(max_new_tokens):
-            # Enforce context length limit
-            curr_input = generated[-self.model.config.context_length :]
-            input_tensor = torch.tensor([curr_input], dtype=torch.long, device=self.device)
+        if not prompt_ids:
+            return generated
 
-            output = self.model(input_tensor)
-            # Logits for the last token position
+        # Truncate prompt from left if it exceeds context length
+        if len(prompt_ids) >= self.model.config.context_length:
+            prompt_ids = prompt_ids[-(self.model.config.context_length - 1) :]
+            generated = list(prompt_ids)
+
+        # 1. Prefill step: process initial prompt sequence
+        prompt_tensor = torch.tensor([prompt_ids], dtype=torch.long, device=self.device)
+        output = self.model(prompt_tensor, use_cache=True)
+        past_key_values = output.past_key_values
+        next_logits = output.logits[:, -1, :]
+
+        next_token = sample_next_token(
+            next_logits,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            repetition_penalty=repetition_penalty,
+            generated_tokens=generated,
+        )
+
+        generated.append(next_token)
+        if callback is not None:
+            callback(next_token)
+
+        if next_token in stop_ids:
+            return generated
+
+        # 2. Fast autoregressive decoding using cached Key-Value states
+        for step in range(1, max_new_tokens):
+            pos = len(prompt_ids) + step - 1
+            if pos >= self.model.config.context_length:
+                break
+
+            if past_key_values is not None:
+                # Fast O(1) step: feed only the latest token with position ID
+                input_tensor = torch.tensor([[next_token]], dtype=torch.long, device=self.device)
+                position_ids = torch.tensor([[pos]], dtype=torch.long, device=self.device)
+                output = self.model(
+                    input_tensor,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    use_cache=True,
+                )
+                past_key_values = output.past_key_values
+            else:
+                # Fallback if caching is disabled
+                curr_input = generated[-self.model.config.context_length :]
+                input_tensor = torch.tensor([curr_input], dtype=torch.long, device=self.device)
+                output = self.model(input_tensor)
+
             next_logits = output.logits[:, -1, :]
-
             next_token = sample_next_token(
                 next_logits,
                 temperature=temperature,

@@ -1,19 +1,29 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from ..language.parser import LanguageParser
 from ..memory.database import MemoryDB
 from ..model.interface import LanguageEngine
+from ..tools.registry import ToolRegistry
 from .state import CognitiveState
 
 
 class CognitiveCore:
-    def __init__(self, engine: LanguageEngine, memory: MemoryDB, state: CognitiveState) -> None:
+    def __init__(
+        self,
+        engine: LanguageEngine,
+        memory: MemoryDB,
+        state: CognitiveState,
+        tools: ToolRegistry | None = None,
+    ) -> None:
         self.engine = engine
         self.memory = memory
         self.state = state
+        self.tools = tools or ToolRegistry()
         self.parser = LanguageParser()
 
-    def handle(self, text: str) -> str:
+    def handle(self, text: str, stream_callback: Callable[[str], None] | None = None) -> str:
         parsed = self.parser.parse(text)
         self.state.last_user_message = text
         self.state.turn_count += 1
@@ -70,9 +80,30 @@ class CognitiveCore:
             response = "The terminal session context is reset. Persistent memories are kept."
         elif parsed.intent == "teach":
             response = self._teach(parsed.argument or "")
+        elif parsed.intent == "calculate":
+            raw_expr = (parsed.argument or "").replace("^", "**")
+            # Strip invalid characters for safety
+            safe_chars = set("0123456789+-*/().% ")
+            clean_expr = "".join(c for c in raw_expr if c in safe_chars).strip()
+            if clean_expr:
+                res = self.tools.execute("calculate", {"expression": clean_expr})
+                if res.get("status") == "success":
+                    response = f"{clean_expr} = {res['result']}"
+                else:
+                    response = f"Math error: {res.get('error')}"
+            else:
+                response = "Please provide a valid math expression, e.g.: calculate 25 * 4 + 10"
         else:
             context = self.memory.recent_messages(8)
-            response = self.engine.generate(text, context)
+            try:
+                import inspect
+                sig = inspect.signature(self.engine.generate)
+                if "callback" in sig.parameters:
+                    response = self.engine.generate(text, context, callback=stream_callback)
+                else:
+                    response = self.engine.generate(text, context)
+            except Exception:
+                response = self.engine.generate(text, context)
 
         self.state.last_response = response
         self.memory.add_message("assistant", response)

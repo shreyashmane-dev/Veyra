@@ -25,4 +25,16 @@ class LanguageParser:
             return ParsedInput(lowered[1:], text)
         if lowered.startswith("what do you remember"):
             return ParsedInput("memory", text)
+        if lowered.startswith("calculate "):
+            return ParsedInput("calculate", text, text[10:].strip())
+        if lowered.startswith("calc "):
+            return ParsedInput("calculate", text, text[5:].strip())
+        if lowered.startswith("math "):
+            return ParsedInput("calculate", text, text[5:].strip())
+        if (lowered.startswith("what is ") or lowered.startswith("solve ")) and any(
+            op in lowered for op in ["+", "-", "*", "/", "%", "^"]
+        ):
+            prefix = "what is " if lowered.startswith("what is ") else "solve "
+            expr = text[len(prefix) :].rstrip("?").strip()
+            return ParsedInput("calculate", text, expr)
         return ParsedInput("chat", text)

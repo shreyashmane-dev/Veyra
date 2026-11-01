@@ -40,6 +40,7 @@ class TrainingConfig:
     detect_nan: bool = True
     max_grad_norm_warn: float = 5.0
     compile_model: bool = False
+    max_time_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -51,8 +52,14 @@ class TrainingConfig:
             yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
 
     @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TrainingConfig:
+        valid_fields = set(cls.__dataclass_fields__.keys())
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
+
+    @classmethod
     def from_yaml(cls, path: str | Path) -> TrainingConfig:
         p = Path(path)
         with open(p, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        return cls(**data)
+        return cls.from_dict(data)

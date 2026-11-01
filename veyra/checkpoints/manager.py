@@ -136,12 +136,22 @@ class CheckpointManager:
             raise FileNotFoundError(f"Checkpoint not found: {p}")
 
         payload = torch.load(p, map_location=device, weights_only=False)
-        config = ModelConfig(**payload["model_config"])
+        if isinstance(payload, dict) and "model_config" in payload:
+            config = ModelConfig.from_dict(payload["model_config"])
+        elif (p.parent / "model_config.yaml").exists():
+            config = ModelConfig.from_yaml(p.parent / "model_config.yaml")
+        else:
+            raise ValueError(f"Could not find model_config in {p} or adjacent model_config.yaml")
+
+        if "instruct" in str(p).lower() or "instruct" in p.parent.name.lower():
+            config.is_instruct = True
+
         model = VeyraLM(config)
-        model.load_state_dict(payload["model_state_dict"])
+        state_dict = payload.get("model_state_dict", payload) if isinstance(payload, dict) else payload
+        model.load_state_dict(state_dict)
         model.to(device)
 
-        return model, payload
+        return model, payload if isinstance(payload, dict) else {"model_state_dict": payload}
 
     def list_checkpoints(self) -> list[dict[str, Any]]:
         """Lists all available checkpoints in the managed directory."""

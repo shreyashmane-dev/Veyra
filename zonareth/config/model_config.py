@@ -28,6 +28,7 @@ class ModelConfig:
     tie_embeddings: bool = True
     initializer_range: float = 0.02
     precision: str = "float32"  # "float32", "bfloat16", "float16"
+    is_instruct: bool = False
 
     def __post_init__(self) -> None:
         if self.hidden_size % self.num_heads != 0:
@@ -121,8 +122,14 @@ class ModelConfig:
             yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
 
     @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ModelConfig:
+        valid_fields = set(cls.__dataclass_fields__.keys())
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
+
+    @classmethod
     def from_yaml(cls, path: str | Path) -> ModelConfig:
         p = Path(path)
         with open(p, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        return cls(**data)
+        return cls.from_dict(data)

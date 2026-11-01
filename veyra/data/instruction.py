@@ -12,7 +12,7 @@ from ..tokenizer.bpe import VeyraTokenizer
 INSTRUCTION_DATASETS = {
     "openhermes": {
         "repo": "teknium/OpenHermes-2.5",
-        "description": "General reasoning, coding, math, and conversational instruction following.",
+        "description": "General reasoning, coding, math, essays, and conversational instruction following.",
     },
     "ultrachat": {
         "repo": "HuggingFaceH4/ultrachat_200k",
@@ -25,6 +25,10 @@ INSTRUCTION_DATASETS = {
     "gsm8k": {
         "repo": "openai/gsm8k",
         "description": "Step-by-step mathematical reasoning and word problem solving.",
+    },
+    "sciq": {
+        "repo": "allenai/sciq",
+        "description": "Physics, chemistry, biology, and scientific reasoning problem solving.",
     },
 }
 
@@ -145,6 +149,19 @@ class InstructionDataIngester:
                 prompt = item.get("question", "")
                 response = item.get("answer", "")
                 if prompt and response:
+                    samples.append({"prompt": prompt, "response": response})
+                if len(samples) >= max_samples:
+                    break
+
+        elif dataset_key == "sciq":
+            ds = load_dataset(repo, split="train", streaming=True)
+            for item in ds:
+                support = item.get("support", "").strip()
+                question = item.get("question", "").strip()
+                answer = item.get("correct_answer", "").strip()
+                prompt = f"Explain and solve this physics/science problem: {question}"
+                response = f"{support}\n\nTherefore, the scientific explanation and solution is: {answer}." if support else f"The scientific solution is {answer}."
+                if question and answer:
                     samples.append({"prompt": prompt, "response": response})
                 if len(samples) >= max_samples:
                     break

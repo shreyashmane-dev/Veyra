@@ -174,6 +174,12 @@ class Trainer:
         tokens_per_batch = self.config.batch_size * self.model.config.context_length
 
         while self.current_step < self.config.max_steps:
+            if self.config.max_time_seconds and (time.time() - start_time) >= self.config.max_time_seconds:
+                hours_run = (time.time() - start_time) / 3600
+                print(f"\n[SESSION GUARD] Elapsed training time reached {hours_run:.2f} hours (limit: {self.config.max_time_seconds / 3600:.2f}h).")
+                print("Gracefully saving final checkpoint and exporting model before session timeout...")
+                break
+
             self.optimizer.zero_grad()
             step_loss = 0.0
 

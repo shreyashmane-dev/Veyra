@@ -19,10 +19,11 @@ class VeyraInferenceEngine(LanguageEngine):
         model: VeyraLM,
         tokenizer: VeyraTokenizer,
         device: torch.device | str = "cpu",
-        temperature: float = 0.7,
+        temperature: float = 0.4,
         top_p: float = 0.9,
-        max_new_tokens: int = 40,
-        system_prompt: str = "You are VEYRA, a serious personal artificial intelligence system.",
+        repetition_penalty: float = 1.2,
+        max_new_tokens: int = 100,
+        system_prompt: str = "You are VEYRA, an advanced, intelligent personal artificial intelligence assistant.",
     ) -> None:
         self.model = model
         self.tokenizer = tokenizer
@@ -33,6 +34,7 @@ class VeyraInferenceEngine(LanguageEngine):
         self.generator = GenerationEngine(self.model, device=self.device)
         self.temperature = temperature
         self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
         self.max_new_tokens = max_new_tokens
         self.system_prompt = system_prompt
 
@@ -42,9 +44,10 @@ class VeyraInferenceEngine(LanguageEngine):
         checkpoint_path: str | Path,
         tokenizer_path: str | Path,
         device: str = "auto",
-        temperature: float = 0.7,
+        temperature: float = 0.4,
         top_p: float = 0.9,
-        max_new_tokens: int = 40,
+        repetition_penalty: float = 1.2,
+        max_new_tokens: int = 100,
     ) -> VeyraInferenceEngine:
         """Loads inference engine directly from checkpoint file and tokenizer directory."""
         dev = "cuda" if (device == "auto" and torch.cuda.is_available()) else ("cpu" if device == "auto" else device)
@@ -56,27 +59,40 @@ class VeyraInferenceEngine(LanguageEngine):
             device=dev,
             temperature=temperature,
             top_p=top_p,
+            repetition_penalty=repetition_penalty,
             max_new_tokens=max_new_tokens,
         )
 
     def format_prompt(self, text: str, context: list[tuple[str, str]]) -> str:
-        """Formats conversational history into special token delimited sequence."""
-        prompt_parts: list[str] = [f"<SYSTEM> {self.system_prompt}"]
+        """Formats conversational history into prompt sequence."""
+        # Use base Q&A format only if explicitly marked as a raw base model
+        is_base = getattr(self.model.config, "is_base", False) or "base" in str(getattr(self.model.config, "model_name", "")).lower()
 
-        for role, msg in context:
-            if role.lower() == "user":
-                prompt_parts.append(f"<USER> {msg}")
-            elif role.lower() == "assistant":
-                prompt_parts.append(f"<ASSISTANT> {msg}")
-
-        prompt_parts.append(f"<USER> {text} <ASSISTANT>")
-        return " ".join(prompt_parts)
+        if not is_base:
+            prompt_parts: list[str] = [f"<SYSTEM> {self.system_prompt}"]
+            for role, msg in context[-4:]:
+                if role.lower() == "user":
+                    prompt_parts.append(f"<USER> {msg}")
+                elif role.lower() == "assistant":
+                    prompt_parts.append(f"<ASSISTANT> {msg}")
+            prompt_parts.append(f"<USER> {text} <ASSISTANT>")
+            return " ".join(prompt_parts) + " "
+        else:
+            # Base pretrained model: use natural Q&A format without noisy untrained special tokens
+            parts = []
+            for role, msg in context[-3:]:
+                r_name = "User" if role.lower() == "user" else "Assistant"
+                parts.append(f"{r_name}: {msg}")
+            parts.append(f"User: {text}\nAssistant:")
+            return "\n".join(parts)
 
     def generate(
         self,
         text: str,
         context: list[tuple[str, str]],
         callback: Callable[[str], None] | None = None,
+        max_new_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> str:
         """Generates response for input text and conversational context."""
         formatted_prompt = self.format_prompt(text, context)
@@ -95,9 +111,10 @@ class VeyraInferenceEngine(LanguageEngine):
 
         output_ids = self.generator.generate(
             prompt_ids=prompt_ids,
-            max_new_tokens=self.max_new_tokens,
-            temperature=self.temperature,
+            max_new_tokens=max_new_tokens or self.max_new_tokens,
+            temperature=temperature if temperature is not None else self.temperature,
             top_p=self.top_p,
+            repetition_penalty=self.repetition_penalty,
             stop_token_ids=stop_token_ids,
             callback=token_stream_cb if callback else None,
         )

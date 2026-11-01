@@ -7,6 +7,8 @@ __pycache__/
 
 # Large generated training artifacts and weights
 checkpoints/**/*.pt
+checkpoints/**/*.zip
+*.zip
 data/shards/**/*.pt
 data/private/*
 !data/private/.gitkeep

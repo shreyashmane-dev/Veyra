@@ -13,12 +13,22 @@ from .model.starter import StarterLanguageEngine
 def get_active_engine(memory: MemoryDB) -> tuple[LanguageEngine, str, str]:
     """Detects trained VEYRA-LM checkpoint or falls back to StarterLanguageEngine."""
     candidates = [
+        ("checkpoints/veyra_instruct_125m/model.pt", "checkpoints/veyra_instruct_125m/tokenizer"),
+        ("checkpoints/zonareth_instruct_125m/model.pt", "checkpoints/zonareth_instruct_125m/tokenizer"),
+        ("checkpoints/veyra_125m/best.pt", "data/tokenizer"),
+        ("checkpoints/veyra_125m/best.pt", "checkpoints/veyra_125m/tokenizer"),
         ("checkpoints/veyra_125m/latest.pt", "checkpoints/veyra_125m/tokenizer"),
         ("checkpoints/veyra_125m/latest.pt", "data/tokenizer"),
         ("checkpoints/veyra_125m/model.pt", "checkpoints/veyra_125m/tokenizer"),
+        ("checkpoints/veyra_125m/model.pt", "data/tokenizer"),
+        ("checkpoints/zonareth_125m/best.pt", "data/tokenizer"),
+        ("checkpoints/zonareth_125m/best.pt", "checkpoints/zonareth_125m/tokenizer"),
         ("checkpoints/zonareth_125m/model.pt", "checkpoints/zonareth_125m/tokenizer"),
+        ("checkpoints/zonareth_125m/model.pt", "data/tokenizer"),
         ("checkpoints/veyra_tiny/latest.pt", "data/tokenizer"),
         ("checkpoints/veyra_tiny/best.pt", "data/tokenizer"),
+        ("checkpoints/zonareth_tiny/latest.pt", "data/tokenizer"),
+        ("checkpoints/zonareth_tiny/best.pt", "data/tokenizer"),
     ]
 
     for ckpt_path, tok_path in candidates:
@@ -26,8 +36,9 @@ def get_active_engine(memory: MemoryDB) -> tuple[LanguageEngine, str, str]:
             try:
                 engine = VeyraInferenceEngine.from_checkpoint(ckpt_path, tok_path)
                 model_name = getattr(engine.model.config, "model_name", "125m")
+                tag = "VEYRA-INSTRUCT" if "instruct" in ckpt_path else "VEYRA-LM"
                 params = engine.model.get_num_params()
-                return engine, f"VEYRA-LM ({model_name})", f"{ckpt_path} ({params:,} params)"
+                return engine, f"{tag} ({model_name})", f"{ckpt_path} ({params:,} params)"
             except Exception as e:
                 # If checkpoint loading fails, continue checking or fallback
                 pass

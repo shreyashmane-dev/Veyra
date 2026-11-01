@@ -61,6 +61,7 @@ def main() -> None:
     )
     parser.add_argument("--num-docs", type=int, default=10000, help="Number of documents to stream")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint .pt file to resume training from")
+    parser.add_argument("--max-hours", type=float, default=11.2, help="Max runtime in hours before graceful checkpoint & exit (default: 11.2 for 12h Kaggle limit)")
     parser.add_argument("--run-sft", action="store_true", help="Automatically run SFT instruction tuning immediately after pretraining")
     parser.add_argument("--sft-steps", type=int, default=1500, help="Number of SFT steps if --run-sft is enabled (default: 1500)")
     parser.add_argument("--hf-repo", type=str, default=None, help="Optional Hugging Face repo ID (e.g. username/zonareth-125m) to push model")
@@ -155,11 +156,17 @@ def main() -> None:
     print(f"\n[2/5] Building ZonarethTokenizer...")
     target_vocab = args.vocab_size if args.model != "tiny" else 1024
 
+    should_train = True
     if (tok_dir / "vocab.json").exists() and (tok_dir / "merges.json").exists():
-        print(f"  Existing ZonarethTokenizer found in {tok_dir}. Loading...")
-        tokenizer = ZonarethTokenizer.load(tok_dir)
-        print(f"  ZonarethTokenizer loaded successfully! Vocab size: {tokenizer.vocab_size}")
-    else:
+        existing_tok = ZonarethTokenizer.load(tok_dir)
+        if existing_tok.vocab_size >= target_vocab:
+            print(f"  Existing ZonarethTokenizer found in {tok_dir} with sufficient vocab ({existing_tok.vocab_size:,}). Loading...")
+            tokenizer = existing_tok
+            should_train = False
+        else:
+            print(f"  Existing tokenizer has only {existing_tok.vocab_size:,} tokens (< target {target_vocab:,}). Training new high-capacity tokenizer...")
+
+    if should_train:
         all_texts = []
         for rf in raw_files:
             try:
@@ -229,6 +236,7 @@ def main() -> None:
     train_cfg = TrainingConfig.from_yaml(train_cfg_path)
     train_cfg.output_dir = str(output_dir)
     train_cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
+    train_cfg.max_time_seconds = int(args.max_hours * 3600) if args.max_hours else None
     if args.steps:
         train_cfg.max_steps = args.steps
     if args.batch_size:
@@ -238,6 +246,8 @@ def main() -> None:
 
     model = ZonarethLM(model_cfg)
     print(f"  Model Parameters: {model.get_num_params():,}")
+    if train_cfg.max_time_seconds:
+        print(f"  Session Timeout Guard: {args.max_hours:.2f} hours (auto-checkpoint and exit before Kaggle cutoff)")
 
     train_shards = list((shards_dir / "train").glob("*.pt"))
     val_shards = list((shards_dir / "val").glob("*.pt"))
@@ -254,8 +264,30 @@ def main() -> None:
         train_dataset=train_ds,
         val_dataset=val_ds,
     )
-    if args.resume:
-        trainer.resume_from_checkpoint(args.resume)
+
+    resume_target = args.resume
+    if not resume_target or resume_target.lower() == "auto":
+        # Check if a previous checkpoint exists to resume automatically
+        candidates_to_resume = [
+            output_dir / "latest.pt",
+            output_dir / "best.pt",
+            Path("/kaggle/working/checkpoints") / f"zonareth_{args.model}" / "latest.pt",
+            Path("/kaggle/working/checkpoints") / f"veyra_{args.model}" / "latest.pt",
+        ]
+        # Also check /kaggle/input for any attached previous session datasets
+        if is_kaggle:
+            candidates_to_resume.extend(list(Path("/kaggle/input").rglob("*latest.pt")))
+            candidates_to_resume.extend(list(Path("/kaggle/input").rglob("*best.pt")))
+
+        for c in candidates_to_resume:
+            if c.exists():
+                resume_target = str(c)
+                print(f"  [AUTO-RESUME] Found existing checkpoint: {resume_target}")
+                break
+
+    if resume_target and Path(resume_target).exists():
+        print(f"  Resuming training state from: {resume_target}")
+        trainer.resume_from_checkpoint(resume_target)
 
     train_results = trainer.train()
 
@@ -381,10 +413,11 @@ print(f"Generated: {output}")
         print("  (Fine-tuning on OpenHermes + CodeAlpaca + GSM8K)")
         print("=" * 70)
         from scripts.run_sft_pipeline import main as run_sft_main
+        base_ckpt_to_use = output_dir / "best.pt" if (output_dir / "best.pt").exists() else output_dir / "latest.pt"
         orig_argv = sys.argv
         sys.argv = [
             "run_sft_pipeline.py",
-            "--base-checkpoint", str(output_dir / "latest.pt"),
+            "--base-checkpoint", str(base_ckpt_to_use),
             "--tokenizer", str(tok_dir),
             "--dataset", "all_mix",
             "--steps", str(args.sft_steps),

@@ -18,3 +18,5 @@ data/private/*
 *.egg-info/
 build/
 dist/
+checkpoints/
+kaggle_sft_runner/

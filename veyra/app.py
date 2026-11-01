@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+import sys
+import time
 from pathlib import Path
 
 from .core.cognitive import CognitiveCore
 from .core.state import CognitiveState
-from .memory.database import MemoryDB
 from .inference.engine import VeyraInferenceEngine
+from .memory.database import MemoryDB
 from .model.interface import LanguageEngine
 from .model.starter import StarterLanguageEngine
+
+
+# ANSI Terminal Colors
+RESET = "\033[0m"
+BOLD = "\033[1m"
+GREEN = "\033[38;2;16;163;127m"   # OpenAI Emerald Green
+CYAN = "\033[38;2;56;189;248m"    # Sky Blue
+DIM = "\033[38;2;140;140;140m"    # Muted Gray
+WHITE = "\033[38;2;240;240;240m"  # Crisp White
+PURPLE = "\033[38;2;192;132;252m" # Lavender
 
 
 def get_active_engine(memory: MemoryDB) -> tuple[LanguageEngine, str, str]:
@@ -39,23 +51,21 @@ def get_active_engine(memory: MemoryDB) -> tuple[LanguageEngine, str, str]:
                 tag = "VEYRA-INSTRUCT" if "instruct" in ckpt_path else "VEYRA-LM"
                 params = engine.model.get_num_params()
                 return engine, f"{tag} ({model_name})", f"{ckpt_path} ({params:,} params)"
-            except Exception as e:
-                # If checkpoint loading fails, continue checking or fallback
+            except Exception:
                 pass
 
     return StarterLanguageEngine(memory), "Starter Engine", "VEYRA-LM slot ready"
 
 
 def make_banner(engine_desc: str, model_desc: str) -> str:
-    return f"""╭──────────────────────────────────────────────────╮
-│                    VEYRA 0.1                     │
-│          Personal Artificial Intelligence        │
-├──────────────────────────────────────────────────┤
-│ Language : {engine_desc:<38}│
-│ Memory   : SQLite                                │
-│ Voice    : Standby                               │
-│ Model    : {model_desc:<38}│
-╰──────────────────────────────────────────────────╯"""
+    return f"""{GREEN}╭─────────────────────────────────────────────────────────────╮
+│ {BOLD}VEYRA GPT-4 (125M Multi-Domain Neural Assistant){RESET}{GREEN}             │
+├─────────────────────────────────────────────────────────────┤
+│ {WHITE}Engine   : {engine_desc:<48}{GREEN}│
+│ {WHITE}Weights  : {model_desc:<48}{GREEN}│
+│ {WHITE}Domains  : Literature | Python | Poetry | Physics | Maths   {GREEN}│
+│ {WHITE}Interface: Terminal (Run {CYAN}run_chatgpt_ui.bat{WHITE} for Browser Web UI){GREEN}  │
+╰─────────────────────────────────────────────────────────────╯{RESET}"""
 
 
 def main() -> None:
@@ -68,20 +78,23 @@ def main() -> None:
     core = CognitiveCore(engine=engine, memory=memory, state=state)
 
     print(make_banner(engine_desc, model_desc))
-    print("Type /help for commands. Type /quit to exit.\n")
+    print(f"{DIM}Commands: /help, /model, /tools, /clear, /quit{RESET}\n")
 
     while True:
         try:
-            text = input("You > ").strip()
+            print(f"\n{BOLD}{CYAN}You ❯ {RESET}", end="", flush=True)
+            text = input().strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nVEYRA > Session closed.")
+            print(f"\n{GREEN}Veyra ❯ {RESET}Session closed. Farewell, Sensei.")
             break
 
         if not text:
             continue
         if text == "/quit":
-            print("VEYRA > Goodbye, Sensei.")
+            print(f"{GREEN}Veyra ❯ {RESET}Goodbye, Sensei.")
             break
+
+        print(f"{BOLD}{GREEN}Veyra ❯ {RESET}", end="", flush=True)
 
         streamed = [False]
 
@@ -89,9 +102,12 @@ def main() -> None:
             streamed[0] = True
             print(piece, end="", flush=True)
 
-        print("VEYRA > ", end="", flush=True)
         response = core.handle(text, stream_callback=on_stream)
         if not streamed[0]:
             print(response)
         else:
             print()
+
+
+if __name__ == "__main__":
+    main()

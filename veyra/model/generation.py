@@ -19,9 +19,10 @@ def sample_next_token(
     # Squeeze to 1D: [vocab_size]
     logits = logits.squeeze().clone()
 
-    # Repetition penalty
+    # Repetition penalty (applied to recent generated tokens to prevent loops without penalizing prompt)
     if repetition_penalty != 1.0 and generated_tokens:
-        for prev_token in set(generated_tokens):
+        recent = set(generated_tokens[-64:])
+        for prev_token in recent:
             if logits[prev_token] > 0:
                 logits[prev_token] /= repetition_penalty
             else:

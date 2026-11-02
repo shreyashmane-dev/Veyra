@@ -70,7 +70,8 @@ class VeyraInferenceEngine(LanguageEngine):
 
         if not is_base:
             prompt_parts: list[str] = [f"<SYSTEM> {self.system_prompt}"]
-            for role, msg in context[-4:]:
+            filtered_context = [(r, m) for r, m in context if not (r.lower() == "user" and m.strip() == text.strip())]
+            for role, msg in filtered_context[-3:]:
                 if role.lower() == "user":
                     prompt_parts.append(f"<USER> {msg}")
                 elif role.lower() == "assistant":

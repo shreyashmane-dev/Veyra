@@ -75,9 +75,9 @@ def main() -> None:
     try:
         if args.dataset == "all_mix":
             print(f"  Ingesting All-Mix: OpenHermes (Literature/Poems/Essays) + CodeAlpaca (Coding) + GSM8K (Math) + SciQ (Physics/STEM)...")
-            oh_count = int(args.samples * 0.35)
+            oh_count = int(args.samples * 0.30)
             code_count = int(args.samples * 0.25)
-            math_count = int(args.samples * 0.20)
+            math_count = int(args.samples * 0.25)
             phys_count = int(args.samples * 0.20)
             samples.extend(ingester.stream_instruction_dataset("openhermes", max_samples=oh_count))
             samples.extend(ingester.stream_instruction_dataset("code_alpaca", max_samples=code_count))
@@ -85,6 +85,34 @@ def main() -> None:
             samples.extend(ingester.stream_instruction_dataset("sciq", max_samples=phys_count))
         else:
             samples = ingester.stream_instruction_dataset(dataset_key=args.dataset, max_samples=args.samples)
+
+        # High-density foundational logic, arithmetic, and capability anchors
+        foundational_anchors = [
+            # Arithmetic & Numerical Logic
+            {"prompt": "What is 2 + 2?", "response": "2 + 2 = 4."},
+            {"prompt": "two add two", "response": "2 + 2 = 4."},
+            {"prompt": "What is 2 + 2? Explain why.", "response": "2 + 2 = 4. Adding two units to another two units results in a total of four units."},
+            {"prompt": "Calculate 15 multiplied by 4.", "response": "15 * 4 = 60."},
+            {"prompt": "What is 100 divided by 4?", "response": "100 / 4 = 25."},
+            {"prompt": "What is 7 plus 8?", "response": "7 + 8 = 15."},
+            {"prompt": "What is 50 minus 18?", "response": "50 - 18 = 32."},
+            {"prompt": "What is 2 to the power of 8?", "response": "2^8 = 256."},
+
+            # Identity & Capabilities
+            {"prompt": "Who are you?", "response": "I am VEYRA, an advanced personal neural AI assistant engineered across literature, coding, science, and mathematics."},
+            {"prompt": "What can you do?", "response": "I can assist you across multiple domains including writing essays and poetry, explaining physics and mathematics step-by-step, solving logic puzzles, and writing clean Python code."},
+            {"prompt": "What is your purpose?", "response": "My purpose is to be your private, intelligent assistant for scientific reasoning, programming, creative writing, and learning."},
+
+            # Logic & Deduction
+            {"prompt": "If all roses are flowers and all flowers need water, do roses need water?", "response": "Yes, roses need water. This follows by transitive deduction: 1) Roses are flowers, 2) All flowers need water, therefore 3) Roses need water."},
+            {"prompt": "What is the difference between deductive and inductive reasoning?", "response": "Deductive reasoning starts with general premises to reach a logically certain specific conclusion (top-down). Inductive reasoning makes generalized conclusions based on specific observations and patterns (bottom-up), which are probable but not logically guaranteed."},
+
+            # Clean Python
+            {"prompt": "Write a Python function to check if a number is prime.", "response": "```python\ndef is_prime(n: int) -> bool:\n    if n <= 1:\n        return False\n    if n <= 3:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n```"},
+            {"prompt": "Write a Python function to compute the factorial of n recursively.", "response": "```python\ndef factorial(n: int) -> int:\n    if n < 0:\n        raise ValueError('Factorial is not defined for negative numbers.')\n    if n in (0, 1):\n        return 1\n    return n * factorial(n - 1)\n```"},
+        ]
+        # Multiply foundational anchors so they are deeply internalized
+        samples.extend(foundational_anchors * 30)
     except Exception as e:
         print(f"  [WARN] Could not stream from HF ({e}). Using built-in comprehensive instruction seeds...")
         samples = [

@@ -937,8 +937,10 @@ class VeyraHTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             stream_lock = threading.Lock()
+            streamed = [False]
 
             def on_token(piece: str) -> None:
+                streamed[0] = True
                 with stream_lock:
                     try:
                         chunk = f"data: {json.dumps({'token': piece})}\n\n"
@@ -949,6 +951,8 @@ class VeyraHTTPHandler(BaseHTTPRequestHandler):
 
             if self.core:
                 full_reply = self.core.handle(user_message, stream_callback=on_token)
+                if not streamed[0] and full_reply:
+                    on_token(full_reply)
             else:
                 full_reply = "Veyra Engine is starting up. Please refresh."
                 on_token(full_reply)

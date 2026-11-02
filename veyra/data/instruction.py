@@ -137,8 +137,10 @@ class InstructionDataIngester:
                 instruction = item.get("instruction", "")
                 inp = item.get("input", "")
                 output = item.get("output", "")
-                prompt = f"{instruction}\n{inp}".strip()
-                if prompt and output:
+                prompt = f"{instruction}\n{inp}".strip() if inp else instruction.strip()
+                if prompt and output and len(output.strip()) > 15:
+                    if "def " in output and "```" not in output:
+                        output = f"```python\n{output.strip()}\n```"
                     samples.append({"prompt": prompt, "response": output})
                 if len(samples) >= max_samples:
                     break
@@ -147,8 +149,17 @@ class InstructionDataIngester:
             ds = load_dataset(repo, "main", split="train", streaming=True)
             for item in ds:
                 prompt = item.get("question", "")
-                response = item.get("answer", "")
-                if prompt and response:
+                raw_ans = item.get("answer", "")
+                if prompt and raw_ans:
+                    # Clean up GSM8K internal calculator annotations into clean step-by-step reasoning
+                    if "####" in raw_ans:
+                        reasoning, final_val = raw_ans.split("####", 1)
+                        clean_reasoning = re.sub(r"<<.*?>>", "", reasoning).strip()
+                        final_val = final_val.strip()
+                        response = f"Let's think step by step:\n{clean_reasoning}\n\nTherefore, the answer is: {final_val}."
+                    else:
+                        clean_ans = re.sub(r"<<.*?>>", "", raw_ans).strip()
+                        response = f"Let's solve this step by step:\n{clean_ans}"
                     samples.append({"prompt": prompt, "response": response})
                 if len(samples) >= max_samples:
                     break

@@ -35,8 +35,12 @@ class CognitiveCore:
             response = "I am VEYRA, a project being built into a small personal AI system."
         elif parsed.intent == "help":
             response = (
-                "Commands: /help, /memory, /status, /model, /tools, /clear, /quit.\n"
-                "You can also teach me with: teach <subject> is <fact>."
+                "I am VEYRA, your personal neural AI assistant. Here is what I can do:\n"
+                "  • 💬 Conversational AI: Ask questions on literature, physics, coding, philosophy, or poetry.\n"
+                "  • 🧮 Precision Math: Instant calculations (e.g., '2+2', 'two add two', '15 * 24').\n"
+                "  • 🧠 Long-Term Memory: Teach facts ('teach Python is a language'), recall ('what do you remember').\n"
+                "  • 🛠 System Tools: Inspect files, directory listings, and system status.\n"
+                "  • ⚡ Commands: /model, /tools, /memory, /status, /clear, /quit."
             )
         elif parsed.intent == "model":
             engine_name = self.engine.__class__.__name__
@@ -77,7 +81,10 @@ class CognitiveCore:
                 f"Confidence: {self.state.confidence:.2f}"
             )
         elif parsed.intent == "clear":
-            response = "The terminal session context is reset. Persistent memories are kept."
+            if hasattr(self.memory, "clear_messages"):
+                self.memory.clear_messages()
+            self.state.turn_count = 0
+            response = "Session context cleared. (Learned long-term facts remain intact)."
         elif parsed.intent == "teach":
             response = self._teach(parsed.argument or "")
         elif parsed.intent == "calculate":

@@ -236,7 +236,15 @@ def main() -> None:
     train_cfg = TrainingConfig.from_yaml(train_cfg_path)
     train_cfg.output_dir = str(output_dir)
     train_cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
-    train_cfg.max_time_seconds = int(args.max_hours * 3600) if args.max_hours else None
+    if args.max_hours:
+        if args.run_sft:
+            pretrain_hours = args.max_hours * 0.65
+            train_cfg.max_time_seconds = int(pretrain_hours * 3600)
+        else:
+            train_cfg.max_time_seconds = int(args.max_hours * 3600)
+    else:
+        train_cfg.max_time_seconds = None
+
     if args.steps:
         train_cfg.max_steps = args.steps
     if args.batch_size:
@@ -247,7 +255,10 @@ def main() -> None:
     model = ZonarethLM(model_cfg)
     print(f"  Model Parameters: {model.get_num_params():,}")
     if train_cfg.max_time_seconds:
-        print(f"  Session Timeout Guard: {args.max_hours:.2f} hours (auto-checkpoint and exit before Kaggle cutoff)")
+        if args.run_sft:
+            print(f"  Session Timeout Guard: Pretraining {args.max_hours * 0.65:.2f}h | SFT {args.max_hours * 0.30:.2f}h (Guaranteed finish within {args.max_hours:.2f}h)")
+        else:
+            print(f"  Session Timeout Guard: {args.max_hours:.2f} hours (auto-checkpoint and exit before Kaggle cutoff)")
 
     train_shards = list((shards_dir / "train").glob("*.pt"))
     val_shards = list((shards_dir / "val").glob("*.pt"))

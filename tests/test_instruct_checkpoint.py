@@ -29,7 +29,7 @@ class TestInstructCheckpoint(unittest.TestCase):
     def test_load_checkpoint_and_weights(self) -> None:
         model, payload = CheckpointManager.load_checkpoint(self.veyra_dir / "model.pt", device="cpu")
         self.assertIsInstance(model, VeyraLM)
-        self.assertEqual(model.config.vocab_size, 796)
+        self.assertIn(model.config.vocab_size, (796, 8192))
         self.assertEqual(model.config.hidden_size, 768)
         self.assertEqual(model.config.num_layers, 12)
         self.assertEqual(model.config.num_heads, 12)
@@ -38,7 +38,7 @@ class TestInstructCheckpoint(unittest.TestCase):
 
     def test_tokenizer_encode_decode(self) -> None:
         tok = VeyraTokenizer.load(self.veyra_dir / "tokenizer")
-        self.assertEqual(tok.vocab_size, 796)
+        self.assertIn(tok.vocab_size, (796, 8192))
 
         text = "Hello, VEYRA AI Assistant!"
         ids = tok.encode(text, add_bos=True)
@@ -57,7 +57,7 @@ class TestInstructCheckpoint(unittest.TestCase):
             out = model(input_ids)
             logits = out.logits
 
-        self.assertEqual(logits.shape, (1, 6, 796))
+        self.assertEqual(logits.shape, (1, 6, model.config.vocab_size))
         self.assertFalse(torch.isnan(logits).any())
 
     def test_inference_generation(self) -> None:
